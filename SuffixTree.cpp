@@ -195,7 +195,8 @@ public:
                 for (int diff = 0; diff < getEdgeSize(e); ++diff) {
                     str.emplace_back(s[edges[e].getI1() + diff]);
                 }
-                collectPathLabels(edges[e].getToNodeId(), str, pathLabels, leafStrs);
+                collectPathLabels(edges[e].getToNodeId(), str, pathLabels,
+                                  leafStrs);
                 for (int diff = 0; diff < getEdgeSize(e); ++diff) {
                     str.pop_back();
                 }
