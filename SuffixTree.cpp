@@ -358,5 +358,7 @@ int main(int argc, const char * argv[]) {
     Tree t9("aa");
     Tree t10("dodo");
     Tree t11("dedododeodo");
+    Tree t12("xabxac");
+    
     return 0;
 }
