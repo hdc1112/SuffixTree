@@ -1,15 +1,19 @@
 #include <algorithm>
+#include <cassert>
 #include <iostream>
+#include <optional>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
 using namespace std;
 
+template<typename T>
 struct Node {
 public:
     Node(): linkId(0), edges() {}
     
-    int getEdgeId(char c) const {
+    int getEdgeId(T c) const {
         auto iterator = edges.find(c);
         return iterator == edges.end() ? -1 : iterator->second;
     }
@@ -18,7 +22,7 @@ public:
         return linkId;
     }
 
-    void setEdgeId(char c, int e) {
+    void setEdgeId(T c, int e) {
         edges[c] = e;
     }
     
@@ -26,9 +30,18 @@ public:
         linkId = v;
     }
     
+    const vector<T> keySet() const {
+        vector<T> keys;
+        for (auto [key, _]: edges) {
+            keys.emplace_back(key);
+        }
+        sort(begin(keys), end(keys));
+        return keys;
+    }
+    
 private:
     int linkId;
-    unordered_map<char, int> edges;
+    unordered_map<T, int> edges;
 };
 
 class Edge {
@@ -101,13 +114,36 @@ private:
     int size;
 };
 
+template<typename T>
+string substr(const vector<T>& vec, int i, int len) {
+    ostringstream oss;
+    int n = vec.size();
+    assert(i >= 0);
+    assert(i + len <= n);
+    for (int j = 0; j < len; ++j) {
+        if (j) {
+            oss << ", ";
+        }
+        oss << vec[i + j];
+    }
+    return oss.str();
+}
+
+template<>
+string substr(const vector<char>& vec, int i, int len) {
+    return {begin(vec) + i, begin(vec) + i + len};
+}
+
+template<typename T>
 class Tree {
 public:
-    Tree(string str): s(str + '$'),
-                      n(s.size()),
-                      end(0),
-                      ap(),
-                      rem(0) {
+    Tree(vector<T> input, optional<T> terminator = nullopt)
+            : vec(input), n(vec.size()), end(-1), ap(), rem(0) {
+        if (terminator) {
+            vec.emplace_back(*terminator);
+            ++n;
+        }
+    
         createNewNode();
         processPhases();
         print();
@@ -126,12 +162,12 @@ public:
             if (i > 0 && nodes[i].getLinkId() > 0) {
                 links.emplace_back(i, nodes[i].getLinkId());
             }
-            for (int j = 0; j < 27; ++j) {
-                char c = (j < 26 ? char('a' + j) : '$');
+            const vector<T>& keys = nodes[i].keySet();
+            for (auto c: keys) {
                 if (int e = nodes[i].getEdgeId(c); e != -1) {
                     const Edge& edge = edges[e];
                     int toNode = edge.getToNodeId();
-                    string str = s.substr(edge.getI1(), getEdgeSize(e));
+                    string str = substr(vec, edge.getI1(), getEdgeSize(e));
                     edgeStrs.emplace_back(i, e, toNode, str);
                     if (toNode == -1) {
                         ++leaves;
@@ -139,11 +175,15 @@ public:
                 }
             }
         }
-        vector<char> str;
-        collectPathLabels(0, str, pathLabels, leafStrs);
+        vector<T> stack;
+        collectPathLabels(0, stack, pathLabels, leafStrs);
+        vector<string> suffixArrays = leafStrs;
+        sort(leafStrs.begin(), leafStrs.end(), [&](auto& l, auto& r) {
+            return l.size() < r.size();
+        });
         
-        cout << "The string is: " << s << endl;
-        cout << "The string size is: " << s.size() << endl;
+        cout << "The string is: " << substr(vec, 0, n) << endl;
+        cout << "The string size is: " << vec.size() << endl;
         cout << "Total number of nodes (no leaves): " << nodes.size() << endl;
         cout << "Total number of edges: " << edges.size() << endl;
         cout << "Total number of leaves: " << leaves << endl;
@@ -162,9 +202,6 @@ public:
             cout << " to " << pathLabels[links[i].second] << endl;
         }
         cout << endl;
-        sort(leafStrs.begin(), leafStrs.end(), [&](auto& l, auto& r) {
-            return l.size() < r.size();
-        });
         cout << "All suffixes: " << endl;
         for (int i = 0; i < leafStrs.size(); ++i) {
             cout << (i + 1) << ": " << leafStrs[i] << endl;
@@ -175,30 +212,33 @@ public:
             cout << "NodeId " << v << " path label is " << str << endl;
         }
         cout << endl;
+        cout << "All suffix arrays: " << endl;
+        for (int i = 0; i < suffixArrays.size(); ++i) {
+            cout << (i + 1) << ": " << suffixArrays[i] << endl;
+        }
         cout << endl;
     }
     
     void collectPathLabels(int v,
-                           vector<char>& str,
+                           vector<T>& stack,
                            unordered_map<int, string>& pathLabels,
                            vector<string>& leafStrs) const {
         if (v == -1) {
-            leafStrs.emplace_back(str.begin(), str.end());
+            leafStrs.emplace_back(substr(stack, 0, stack.size()));
             return;
         }
-        string pathLabel(str.begin(), str.end());
-        pathLabels[v] = pathLabel;
-        for (int i = 0; i < 27; ++i) {
-            char c = (i < 26 ? char('a' + i) : '$');
-            int e = nodes[v].getEdgeId(c);
+        pathLabels[v] = substr(stack, 0, stack.size());
+        const vector<T> keys = nodes[v].keySet();
+        for (int i = 0; i < keys.size(); ++i) {
+            int e = nodes[v].getEdgeId(keys[i]);
             if (e != -1) {
                 for (int diff = 0; diff < getEdgeSize(e); ++diff) {
-                    str.emplace_back(s[edges[e].getI1() + diff]);
+                    stack.emplace_back(vec[edges[e].getI1() + diff]);
                 }
-                collectPathLabels(edges[e].getToNodeId(), str, pathLabels,
+                collectPathLabels(edges[e].getToNodeId(), stack, pathLabels,
                                   leafStrs);
                 for (int diff = 0; diff < getEdgeSize(e); ++diff) {
-                    str.pop_back();
+                    stack.pop_back();
                 }
             }
         }
@@ -215,7 +255,7 @@ private:
         ap.setSize(0);
         
         for (int len = j - i + 1, skip = 0; i > 0 && len; len -= skip) {
-            int e = nodes[ap.getNode()].getEdgeId(s[i]);
+            int e = nodes[ap.getNode()].getEdgeId(vec[i]);
             Edge& edge = edges[e];
             if (len < getEdgeSize(edge)) {
                 ap.setI(edge.getI1());
@@ -233,14 +273,14 @@ private:
     }
     
     int rule2(int i) {
-        int e = nodes[ap.getNode()].getEdgeId(s[ap.getI()]);
+        int e = nodes[ap.getNode()].getEdgeId(vec[ap.getI()]);
         int newE1 = createNewEdge(edges[e].getI1() + ap.getSize(),
                                   edges[e].getI2(),
                                   edges[e].getToNodeId());
         int newE2 = createNewEdge(i);
         int newV = createNewNode();
-        nodes[newV].setEdgeId(s[edges[newE1].getI1()], newE1);
-        nodes[newV].setEdgeId(s[edges[newE2].getI1()], newE2);
+        nodes[newV].setEdgeId(vec[edges[newE1].getI1()], newE1);
+        nodes[newV].setEdgeId(vec[edges[newE2].getI1()], newE2);
         edges[e].setI2(edges[e].getI1() + ap.getSize() - 1);
         edges[e].setNode(newV);
         followLink(edges[e].getI1(), edges[e].getI2());
@@ -269,9 +309,9 @@ private:
         int prevNode = -1;
         
         while (rem) {
-            Node& node = nodes[ap.getNode()];
+            auto& node = nodes[ap.getNode()];
             if (ap.getI() == -1) {
-                char c = s[i];
+                T c = vec[i];
                 int e = node.getEdgeId(c);
                 if (e != -1) {
                     rule3(e, i);
@@ -284,10 +324,10 @@ private:
                     }
                 }
             } else {
-                char dir = s[ap.getI()];
+                T dir = vec[ap.getI()];
                 int e = node.getEdgeId(dir);
                 Edge& edge = edges[e];
-                if (s[i] == s[edge.getI1() + ap.getSize()]) {
+                if (vec[i] == vec[edge.getI1() + ap.getSize()]) {
                     rule3(e, i);
                     break;
                 } else {
@@ -307,7 +347,8 @@ private:
     }
     
     void processPhases() {
-        for (int i = 0; i < n; ++i, ++end) {
+        for (int i = 0; i < n; ++i) {
+            ++end;
             processPhase(i);
         }
     }
@@ -337,28 +378,36 @@ private:
         return r - l + 1;
     }
     
-    string s;
+    vector<T> vec;
     int n;
     int end;
-    vector<Node> nodes;
+    vector<Node<T>> nodes;
     vector<Edge> edges;
     Point ap;
     int rem;
 };
 
+vector<char> vectorize(const string& s) {
+    return {begin(s), end(s)};
+}
+
 int main(int argc, const char * argv[]) {
-    Tree t1("banana");
-    Tree t2("adeacdade");
-    Tree t3("abcabxabcd");
-    Tree t4("abcdefabxybcdmnabcdex");
-    Tree t5("abcadak");
-    Tree t6("abcabxabcd");
-    Tree t7("mississippi");
-    Tree t8("ooooooooo");
-    Tree t9("aa");
-    Tree t10("dodo");
-    Tree t11("dedododeodo");
-    Tree t12("xabxac");
+    Tree<char> t1(vectorize("banana"), '$');
+    Tree<char> t2(vectorize("adeacdade"), '$');
+    Tree<char> t3(vectorize("abcabxabcd"), '$');
+    Tree<char> t4(vectorize("abcdefabxybcdmnabcdex"), '$');
+    Tree<char> t5(vectorize("abcadak"), '$');
+    Tree<char> t6(vectorize("abcabxabcd"), '$');
+    Tree<char> t7(vectorize("mississippi"), '$');
+    Tree<char> t8(vectorize("ooooooooo"), '$');
+    Tree<char> t9(vectorize("aa"), '$');
+    Tree<char> t10(vectorize("dodo"), '$');
+    Tree<char> t11(vectorize("dedododeodo"), '$');
+    Tree<char> t12(vectorize("xabxac"), '$');
+    Tree<int> t13(vector<int>{1}, -1);
+    Tree<int> t14(vector<int>{1, 2, 3, 2, 3, 2}, -1);
+    Tree<int> t15(vector<int>{0,1,2,3,4,-1,2,3,4,-2,4,0,1,2,3,-3});
+    Tree<char> t16(vectorize("abca#bcad$daca%"));
     
     return 0;
 }
