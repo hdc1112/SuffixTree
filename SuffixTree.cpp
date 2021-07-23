@@ -175,8 +175,11 @@ public:
                 }
             }
         }
-        vector<T> stack;
-        collectPathLabels(0, stack, pathLabels, leafStrs);
+        // temporary stack to hold all items in preorder walk
+        vector<T> buffer;
+        // longest common prefix for suffix arrays
+        vector<int> lcp;
+        collectPathLabels(0, buffer, pathLabels, leafStrs, 0, 0, lcp);
         vector<string> suffixArrays = leafStrs;
         sort(leafStrs.begin(), leafStrs.end(), [&](auto& l, auto& r) {
             return l.size() < r.size();
@@ -191,8 +194,8 @@ public:
         cout << endl;
         cout << "Each edge's information:" << endl;
         for (auto [v1, e, v2, str]: edgeStrs) {
-            cout << "Edge id " << e << " from node " << v1 << " to ";
-            cout << "node " << v2 << " string is " << str << endl;
+            cout << "Edge id " << e << "\tfrom node " << v1 << "\tto ";
+            cout << "node " << v2 << "\tstring is\t" << str << endl;
         }
         cout << endl;
         cout << "Each link's information:" << endl;
@@ -212,33 +215,39 @@ public:
             cout << "NodeId " << v << " path label is " << str << endl;
         }
         cout << endl;
-        cout << "All suffix arrays: " << endl;
+        cout << "All suffix arrays and LCP array: " << endl;
         for (int i = 0; i < suffixArrays.size(); ++i) {
-            cout << (i + 1) << ": " << suffixArrays[i] << endl;
+            cout << "Index " << i << ": LCP " << lcp[i];
+            cout << ": " << suffixArrays[i] << endl;
         }
         cout << endl;
     }
     
     void collectPathLabels(int v,
-                           vector<T>& stack,
+                           vector<T>& buffer,
                            unordered_map<int, string>& pathLabels,
-                           vector<string>& leafStrs) const {
+                           vector<string>& leafStrs,
+                           int common,
+                           int size,
+                           vector<int>& lcp) const {
         if (v == -1) {
-            leafStrs.emplace_back(substr(stack, 0, stack.size()));
+            leafStrs.emplace_back(substr(buffer, 0, buffer.size()));
+            lcp.emplace_back(common);
             return;
         }
-        pathLabels[v] = substr(stack, 0, stack.size());
+        pathLabels[v] = substr(buffer, 0, buffer.size());
         const vector<T> keys = nodes[v].keySet();
         for (int i = 0; i < keys.size(); ++i) {
-            int e = nodes[v].getEdgeId(keys[i]);
-            if (e != -1) {
-                for (int diff = 0; diff < getEdgeSize(e); ++diff) {
-                    stack.emplace_back(vec[edges[e].getI1() + diff]);
+            if (int e = nodes[v].getEdgeId(keys[i]); e != -1) {
+                int edgeSize = getEdgeSize(e);
+                for (int diff = 0; diff < edgeSize; ++diff) {
+                    buffer.emplace_back(vec[edges[e].getI1() + diff]);
                 }
-                collectPathLabels(edges[e].getToNodeId(), stack, pathLabels,
-                                  leafStrs);
-                for (int diff = 0; diff < getEdgeSize(e); ++diff) {
-                    stack.pop_back();
+                collectPathLabels(edges[e].getToNodeId(), buffer, pathLabels,
+                                  leafStrs, i ? size : common, size + edgeSize,
+                                  lcp);
+                for (int diff = 0; diff < edgeSize; ++diff) {
+                    buffer.pop_back();
                 }
             }
         }
