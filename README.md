@@ -14,3 +14,5 @@ Tested for the following cases:
 *    "aa"
 *    "dodo"
 *    "dedododeodo"
+
+The implementation is applied to solve a hard leetcode problem (longest common substring) and get accepted by its online judge system: https://leetcode.com/problems/longest-common-subpath/discuss/1357875/Suffix-Tree-greater-DFS-greater-Suffix-Array-greater-Longest-Common-Prefix-greater-Monotonic-Queue-greater-Sliding-window.
